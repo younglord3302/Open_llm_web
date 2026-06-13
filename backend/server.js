@@ -218,6 +218,63 @@ app.delete('/api/chats/:id', (req, res) => {
   }
 });
 
+// --- Chat File Attachments ---
+app.post('/api/chats/:chatId/attach', upload.single('file'), async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const rawText = await extractTextFromFile(req.file);
+    if (!rawText || !rawText.trim()) {
+      return res.status(400).json({ error: 'Failed to extract text or file is empty' });
+    }
+
+    const attachment = {
+      id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      chatId,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      text: rawText,
+      timestamp: new Date().toISOString()
+    };
+
+    // Store attachment in db
+    const data = db.read();
+    if (!data.chatAttachments) data.chatAttachments = [];
+    data.chatAttachments.push(attachment);
+    db.write(data);
+
+    res.status(201).json({ success: true, attachment: { id: attachment.id, fileName: attachment.fileName, fileSize: attachment.fileSize } });
+  } catch (err) {
+    console.error("Chat attach error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/chats/:chatId/attachments', (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const data = db.read();
+    const attachments = (data.chatAttachments || []).filter(a => a.chatId === chatId);
+    res.json(attachments.map(a => ({ id: a.id, fileName: a.fileName, fileSize: a.fileSize, mimeType: a.mimeType, timestamp: a.timestamp })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chats/:chatId/attachments/:attId', (req, res) => {
+  try {
+    const { chatId, attId } = req.params;
+    const data = db.read();
+    data.chatAttachments = (data.chatAttachments || []).filter(a => !(a.chatId === chatId && a.id === attId));
+    db.write(data);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/messages/:chatId', (req, res) => {
   try {
     res.json(db.getMessages(req.params.chatId));

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Send, Paperclip, FileText, Database, Mic, MicOff, Volume2, VolumeX, Check
+  Send, Paperclip, FileText, Database, Mic, MicOff, Volume2, VolumeX, Check,
+  FileJson, FileCode
 } from 'lucide-react';
 import { api, AuthError } from '../utils/api';
 import { MarkdownContent, ReasoningBlock } from './MarkdownRenderer';
@@ -35,6 +36,48 @@ export default function ChatWorkspace({
   documents, selectedDocIds, onToggleDocSelect,
   onCreateChat, addToast, onAuthError
 }) {
+  // ── Export functions ──────────────────────────────────────────────────────
+  const exportAsJSON = () => {
+    const data = {
+      chatId: chat?.id,
+      title: chat?.title || 'Untitled',
+      exportedAt: new Date().toISOString(),
+      messages: messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        sources: m.sources || []
+      }))
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-${chat?.id || 'export'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Chat exported as JSON', 'success');
+  };
+
+  const exportAsMarkdown = () => {
+    let md = `# ${chat?.title || 'Chat Export'}\n\n`;
+    md += `*Exported: ${new Date().toLocaleString()}*\n\n---\n\n`;
+    messages.forEach(m => {
+      const role = m.role === 'user' ? '👤 **You**' : '🧠 **Assistant**';
+      md += `### ${role}\n\n${m.content}\n\n`;
+      if (m.sources?.length > 0) {
+        md += `> Sources: ${m.sources.map(s => `${s.documentName} (${Math.round(s.similarity * 100)}%)`).join(', ')}\n\n`;
+      }
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-${chat?.id || 'export'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Chat exported as Markdown', 'success');
+  };
   const [inputText, setInputText]         = useState('');
   const [streamingMessage, setStreamingMessage] = useState('');
   const [isStreaming, setIsStreaming]     = useState(false);
@@ -43,6 +86,9 @@ export default function ChatWorkspace({
   const [ttsEnabled, setTtsEnabled]      = useState(() => {
     try { return JSON.parse(localStorage.getItem('llm_prefs') || '{}').tts || false; } catch { return false; }
   });
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [isAttaching, setIsAttaching]    = useState(false);
+  const fileInputRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef    = useRef(null);
@@ -91,9 +137,52 @@ export default function ChatWorkspace({
   };
 
   // ── Send message ──────────────────────────────────────────────────────────
+  // ── File attachment ──────────────────────────────────────────────────────
+  const handleFileAttach = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!chat?.id) { addToast('Start a conversation first to attach files.', 'error'); return; }
+
+    setIsAttaching(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('llm_token');
+      const res = await fetch(`/api/chats/${chat.id}/attach`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+      });
+      if (res.status === 401) { onAuthError(); return; }
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAttachedFiles(prev => [...prev, data.attachment]);
+        addToast(`Attached: ${data.attachment.fileName}`, 'success');
+      } else {
+        addToast(data.error || 'Failed to attach file', 'error');
+      }
+    } catch (err) {
+      addToast(`Attach error: ${err.message}`, 'error');
+    } finally {
+      setIsAttaching(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (attId) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== attId));
+  };
+
   const handleSend = async () => {
     if (!inputText.trim() || isStreaming) return;
-    const userQuery = inputText;
+    let userQuery = inputText;
+    
+    // Prepend attached file contents to the query
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles.map(f => `[File: ${f.fileName}]\n${f.text || ''}`).join('\n\n');
+      userQuery = `${userQuery}\n\n--- Attached Files ---\n${fileContext}`;
+      setAttachedFiles([]);
+    }
     setInputText('');
     setIsStreaming(true);
     setStreamingMessage('');
@@ -166,6 +255,18 @@ export default function ChatWorkspace({
 
   return (
     <div className="chat-workspace">
+      {/* Export bar */}
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', gap: '8px', padding: '8px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+          <button className="secondary-btn" onClick={exportAsJSON} style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <FileJson size={14} /> Export JSON
+          </button>
+          <button className="secondary-btn" onClick={exportAsMarkdown} style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <FileCode size={14} /> Export Markdown
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="messages-list">
         {messages.length === 0 && !streamingMessage && !isStreaming && (
@@ -263,6 +364,19 @@ export default function ChatWorkspace({
           </div>
         )}
 
+        {/* Attached files chips */}
+        {attachedFiles.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '6px 0' }}>
+            {attachedFiles.map(f => (
+              <span key={f.id} className="selected-doc-tag" style={{ background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.3)' }}>
+                <FileText size={12} style={{ color: '#10b981' }} />
+                <span>{f.fileName}</span>
+                <button className="remove-doc-tag-btn" onClick={() => removeAttachment(f.id)}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="prompt-bar-wrapper">
           {/* RAG selector */}
           <div style={{ position: 'relative' }}>
@@ -303,6 +417,24 @@ export default function ChatWorkspace({
           />
 
           <div className="prompt-actions">
+            {/* File attach button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.pdf,.csv,.json,.js,.py,.ts,.jsx,.tsx,.html,.css,.xml,.log"
+              style={{ display: 'none' }}
+              onChange={handleFileAttach}
+            />
+            <button
+              className="prompt-icon-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || isAttaching}
+              title="Attach a file"
+              style={{ color: isAttaching ? '#f59e0b' : 'var(--text-secondary)' }}
+            >
+              <FileText size={16} />
+            </button>
+
             {/* Voice input button */}
             <button
               className={`prompt-icon-btn ${isListening ? 'send' : ''}`}

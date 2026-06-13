@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, MessageSquare, Cpu, Database, Bot,
-  Plus, Trash2, Settings, LogOut, ChevronDown, User, Code
+  Plus, Trash2, Settings, LogOut, ChevronDown, Code
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ChatWorkspace from './components/ChatWorkspace';
@@ -13,6 +13,7 @@ import LoginPage from './components/LoginPage';
 import ModelArena from './components/ModelArena';
 import Toast from './components/Toast';
 import WebDevWorkspace from './components/WebDevWorkspace';
+import FineTunePage from './components/FineTunePage';
 import { api, AuthError } from './utils/api';
 
 export default function App() {
@@ -242,6 +243,7 @@ export default function App() {
             { id: 'knowledge', label: 'Knowledge Base',    icon: <Bot size={18} /> },
             { id: 'agents',    label: 'Agent Marketplace', icon: <Bot size={18} /> },
             { id: 'webdev',    label: 'Web Dev Workspace', icon: <Code size={18} /> },
+            { id: 'finetune',  label: 'Fine-Tune',         icon: <Database size={18} /> },
             { id: 'settings',  label: 'Settings',          icon: <Settings size={18} /> },
           ].map(nav => (
             <div
@@ -371,6 +373,9 @@ export default function App() {
             addToast={addToast}
             onAuthError={handleAuthError}
           />
+        )}
+        {view === 'finetune' && (
+          <FineTunePage addToast={addToast} />
         )}
         {view === 'settings' && (
           <SettingsPage user={user} addToast={addToast} onLogout={handleLogout} />
