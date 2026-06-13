@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, MessageSquare, Cpu, Database, Bot,
-  Plus, Trash2, Settings, LogOut, ChevronDown, Code
+  Plus, Trash2, Settings, LogOut, ChevronDown, Code,
+  Search, FileText, Key, Image
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ChatWorkspace from './components/ChatWorkspace';
@@ -14,6 +15,10 @@ import ModelArena from './components/ModelArena';
 import Toast from './components/Toast';
 import WebDevWorkspace from './components/WebDevWorkspace';
 import FineTunePage from './components/FineTunePage';
+import PromptTemplates from './components/PromptTemplates';
+import ImageGenerator from './components/ImageGenerator';
+import SearchPage from './components/SearchPage';
+import ApiKeyManager from './components/ApiKeyManager';
 import { api, AuthError } from './utils/api';
 
 export default function App() {
@@ -242,8 +247,12 @@ export default function App() {
             { id: 'models',    label: 'Model Manager',     icon: <Database size={18} /> },
             { id: 'knowledge', label: 'Knowledge Base',    icon: <Bot size={18} /> },
             { id: 'agents',    label: 'Agent Marketplace', icon: <Bot size={18} /> },
-            { id: 'webdev',    label: 'Web Dev Workspace', icon: <Code size={18} /> },
+            { id: 'search',    label: 'Search',            icon: <Search size={18} /> },
+            { id: 'prompts',   label: 'Prompt Templates',  icon: <FileText size={18} /> },
+            { id: 'images',    label: 'Image Gen',         icon: <Image size={18} /> },
+            { id: 'webdev',    label: 'Web Dev Studio',    icon: <Code size={18} /> },
             { id: 'finetune',  label: 'Fine-Tune',         icon: <Database size={18} /> },
+            { id: 'keys',      label: 'API Keys',          icon: <Key size={18} /> },
             { id: 'settings',  label: 'Settings',          icon: <Settings size={18} /> },
           ].map(nav => (
             <div
@@ -374,8 +383,21 @@ export default function App() {
             onAuthError={handleAuthError}
           />
         )}
+        {view === 'search' && (
+          <SearchPage addToast={addToast} onAuthError={handleAuthError}
+            onSelectChat={(chatId) => { const c = chats.find(ch => ch.id === chatId); if(c){setActiveChat(c);setView('chat');}} } />
+        )}
+        {view === 'prompts' && (
+          <PromptTemplates addToast={addToast} onAuthError={handleAuthError} />
+        )}
+        {view === 'images' && (
+          <ImageGenerator addToast={addToast} onAuthError={handleAuthError} />
+        )}
         {view === 'finetune' && (
           <FineTunePage addToast={addToast} />
+        )}
+        {view === 'keys' && (
+          <ApiKeyManager addToast={addToast} onAuthError={handleAuthError} />
         )}
         {view === 'settings' && (
           <SettingsPage user={user} addToast={addToast} onLogout={handleLogout} />

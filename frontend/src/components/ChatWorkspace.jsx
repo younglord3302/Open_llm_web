@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Send, Paperclip, FileText, Database, Mic, MicOff, Volume2, VolumeX, Check,
-  FileJson, FileCode
+  FileJson, FileCode, GitBranch
 } from 'lucide-react';
 import { api, AuthError } from '../utils/api';
 import { MarkdownContent, ReasoningBlock } from './MarkdownRenderer';
@@ -255,7 +255,7 @@ export default function ChatWorkspace({
 
   return (
     <div className="chat-workspace">
-      {/* Export bar */}
+      {/* Export & Fork bar */}
       {messages.length > 0 && (
         <div style={{ display: 'flex', gap: '8px', padding: '8px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
           <button className="secondary-btn" onClick={exportAsJSON} style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -264,6 +264,24 @@ export default function ChatWorkspace({
           <button className="secondary-btn" onClick={exportAsMarkdown} style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <FileCode size={14} /> Export Markdown
           </button>
+          {chat?.id && (
+            <button className="secondary-btn" onClick={async () => {
+              try {
+                const token = localStorage.getItem('llm_token');
+                const res = await fetch(`/api/chats/${chat.id}/fork`, {
+                  method: 'POST',
+                  headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  addToast('Chat forked!', 'success');
+                  onCreateChat(data.title, data.model_id, data.agent_id);
+                }
+              } catch { addToast('Failed to fork chat', 'error'); }
+            }} style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <GitBranch size={14} /> Fork
+            </button>
+          )}
         </div>
       )}
 

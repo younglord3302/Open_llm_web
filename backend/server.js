@@ -13,6 +13,7 @@ import { registerUser, loginUser, authMiddleware } from './services/authService.
 import { workspaceService } from './services/workspaceService.js';
 import { fileURLToPath } from 'url';
 import { startWebSocketServer } from './services/wsService.js';
+import { exec } from 'child_process';
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -599,6 +600,105 @@ app.post('/api/webdev/orchestrate', authMiddleware, async (req, res) => {
     res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
     res.end();
   }
+});
+
+// ── Conversation Search ──
+app.post('/api/search', (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query || !query.trim()) return res.status(400).json({ error: 'Query is required' });
+    const results = db.searchMessages(query);
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Chat Forking ──
+app.post('/api/chats/:id/fork', (req, res) => {
+  try {
+    const forked = db.forkChat(req.params.id);
+    if (!forked) return res.status(404).json({ error: 'Chat not found' });
+    res.status(201).json(forked);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Prompt Templates ──
+app.get('/api/prompts', (req, res) => {
+  res.json(db.getPromptTemplates());
+});
+app.post('/api/prompts', (req, res) => {
+  const { id, name, content, category } = req.body;
+  if (!name || !content) return res.status(400).json({ error: 'Name and content are required' });
+  const saved = db.savePromptTemplate({ id: id || null, name, content, category: category || 'general' });
+  res.status(201).json(saved);
+});
+app.delete('/api/prompts/:id', (req, res) => {
+  db.deletePromptTemplate(req.params.id);
+  res.json({ success: true });
+});
+
+// ── API Key Management ──
+app.get('/api/keys', (req, res) => {
+  res.json(db.getApiKeys());
+});
+app.post('/api/keys', (req, res) => {
+  const { provider, key } = req.body;
+  if (!provider || !key) return res.status(400).json({ error: 'Provider and key are required' });
+  const saved = db.saveApiKey({ provider, key });
+  res.status(201).json(saved);
+});
+app.delete('/api/keys/:id', (req, res) => {
+  db.deleteApiKey(req.params.id);
+  res.json({ success: true });
+});
+
+// ── Image Generation (Stable Diffusion / DALL-E) ──
+app.post('/api/generate-image', async (req, res) => {
+  try {
+    const { prompt, provider, size } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+    
+    const activeProvider = provider || 'stability';
+    const imageSize = size || '1024x1024';
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    res.write(`data: ${JSON.stringify({ type: 'status', message: `Generating with ${activeProvider}… Size: ${imageSize}` })}\n\n`);
+
+    // Mock image generation (in production, call provider API)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    res.write(`data: ${JSON.stringify({ type: 'complete', url: null, prompt, message: 'Mock image generation complete. Configure a real API key in Settings > API Keys for real generation.' })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    if (res.headersSent) {
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.end();
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// ── Plugins ──
+app.get('/api/plugins', (req, res) => {
+  res.json(db.getPlugins());
+});
+app.post('/api/plugins', (req, res) => {
+  const plugin = req.body;
+  if (!plugin.name || !plugin.handler) return res.status(400).json({ error: 'Name and handler are required' });
+  const saved = db.savePlugin({ ...plugin, enabled: true });
+  res.status(201).json(saved);
+});
+app.delete('/api/plugins/:id', (req, res) => {
+  db.deletePlugin(req.params.id);
+  res.json({ success: true });
 });
 
 // SPA catch-all — serve index.html for any non-API route
