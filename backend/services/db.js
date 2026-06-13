@@ -89,6 +89,7 @@ export const db = {
       title: title || 'New Conversation',
       model_id: modelId,
       agent_id: agentId,
+      pinned: false,
       created_at: new Date().toISOString()
     };
     data.chats.push(newChat);
@@ -102,6 +103,16 @@ export const db = {
     data.messages = data.messages.filter(m => m.chat_id !== id);
     this.write(data);
     return true;
+  },
+
+  togglePinChat(id) {
+    const data = this.read();
+    const chat = data.chats.find(c => c.id === id);
+    if (chat) {
+      chat.pinned = !chat.pinned;
+      this.write(data);
+    }
+    return chat;
   },
 
   getMessages(chatId) {

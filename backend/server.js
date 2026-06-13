@@ -219,6 +219,17 @@ app.delete('/api/chats/:id', (req, res) => {
   }
 });
 
+// ── Pin Chat ──
+app.post('/api/chats/:id/pin', (req, res) => {
+  try {
+    const chat = db.togglePinChat(req.params.id);
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+    res.json({ success: true, pinned: chat.pinned });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Chat File Attachments ---
 app.post('/api/chats/:chatId/attach', upload.single('file'), async (req, res) => {
   try {
