@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  openllm-ui:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - openllm-data:/app/workspace
+      - openllm-db:/app/db-data
+    environment:
+      - PORT=5000
+      - JWT_SECRET=change-this-in-production
+    restart: unless-stopped
+
+  # Optional: Ollama service (uncomment if you want Ollama in Docker)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   restart: unless-stopped
+
+volumes:
+  openllm-data:
+  openllm-db:
+  # ollama-data:

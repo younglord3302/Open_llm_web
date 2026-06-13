@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Runtime database (user data)
+backend/db.json
+
+# Workspace files (user projects)
+backend/workspace/*
+!backend/workspace/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.eslintcache
+.vite/
+
+# Uploads (in-memory multer, but just in case)
+uploads/
